@@ -80,6 +80,7 @@ class _LoginPageState extends State<LoginPage> {
                     controller: passwordTextController,
                     hintText: 'Password',
                     obscureText: true),
+
                 const SizedBox(
                   height: 10,
                 ),
