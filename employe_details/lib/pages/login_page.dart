@@ -1,3 +1,5 @@
+// ignore_for_file: unused_element
+
 import 'package:employe_details/components/button.dart';
 import 'package:employe_details/components/text_field.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -14,6 +16,11 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final emailTextController = TextEditingController();
   final passwordTextController = TextEditingController();
+
+  bool _isValidEmail(String email) {
+    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    return emailRegex.hasMatch(email);
+  }
 
   void sigin() async {
     showDialog(
@@ -72,15 +79,29 @@ class _LoginPageState extends State<LoginPage> {
                 MyTextFieeld(
                     controller: emailTextController,
                     hintText: 'Email',
-                    obscureText: false),
+                    obscureText: false,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter a password';
+                      } else {
+                        return null;
+                      }
+                    }),
                 const SizedBox(
                   height: 10,
                 ),
                 MyTextFieeld(
-                    controller: passwordTextController,
-                    hintText: 'Password',
-                    obscureText: true),
-
+                  controller: passwordTextController,
+                  hintText: 'Password',
+                  obscureText: true,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter a password';
+                    } else {
+                      return null;
+                    }
+                  },
+                ),
                 const SizedBox(
                   height: 10,
                 ),

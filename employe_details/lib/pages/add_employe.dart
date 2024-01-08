@@ -1,108 +1,91 @@
-// ignore_for_file: use_build_context_synchronously
+// ignore_for_file: avoid_print, use_build_context_synchronously
 
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:csc_picker/csc_picker.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart' as firebase_storage;
+import 'package:intl/intl.dart';
 
-typedef UpdateCallback = Function(String value, String id);
-
-class AddEmploye extends StatefulWidget {
-  const AddEmploye({Key? key}) : super(key: key);
+class AddEmployee extends StatefulWidget {
+  const AddEmployee({Key? key}) : super(key: key);
 
   @override
-  State<AddEmploye> createState() => _AddEmployeState();
+  State<AddEmployee> createState() => _AddEmployeeState();
 }
 
-class _AddEmployeState extends State<AddEmploye> {
+class _AddEmployeeState extends State<AddEmployee> {
   final ImagePicker _picker = ImagePicker();
   XFile? _image;
 
   Future<void> _selectImage() async {
     XFile? pickedImage = await _picker.pickImage(source: ImageSource.gallery);
     if (pickedImage != null) {
-      setState(
-        () {
-          _image = pickedImage;
-        },
-      );
+      setState(() {
+        _image = pickedImage;
+      });
     }
   }
 
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   final TextEditingController _name = TextEditingController();
-  final TextEditingController _adress = TextEditingController();
+  final TextEditingController _address = TextEditingController();
   final TextEditingController _email = TextEditingController();
   final TextEditingController _designation = TextEditingController();
   final TextEditingController _number = TextEditingController();
   String countryValue = "";
   String? stateValue = "";
   String? cityValue = "";
+  String? _selectedGender;
 
-  final CollectionReference _addEmploye =
-      FirebaseFirestore.instance.collection("employes");
+  final CollectionReference _addEmployee =
+      FirebaseFirestore.instance.collection("employees");
+
+  Future<String?> uploadImageToFirebase(XFile imageFile) async {
+    try {
+      firebase_storage.Reference ref = firebase_storage.FirebaseStorage.instance
+          .ref()
+          .child('employee_images/${DateTime.now().millisecondsSinceEpoch}');
+      await ref.putFile(File(imageFile.path));
+      String imageUrl = await ref.getDownloadURL();
+      return imageUrl;
+    } catch (e) {
+      print("Error uploading image to Firebase Storage: $e");
+      return null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        leading: IconButton(
-          onPressed: () {
-            Navigator.pop(context);
-          },
-          icon: const Icon(
-            Icons.keyboard_backspace,
-            color: Colors.red,
-            size: 30,
-          ),
-        ),
-        title: const Text(
-          'Add Employee Details',
-          style: TextStyle(color: Colors.green),
-        ),
+        title: const Text('Add Employee'),
       ),
       body: SingleChildScrollView(
         child: Form(
           key: _formKey,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Stack(
-                    children: [
-                      _image != null
-                          ? CircleAvatar(
-                              radius: 40,
-                              backgroundImage: FileImage(File(_image!.path)),
-                            )
-                          : const CircleAvatar(
-                              backgroundImage: AssetImage('images/employe.png'),
-                              radius: 40,
-                            ),
-                      Positioned(
-                        left: 40,
-                        bottom: -16,
-                        child: IconButton(
-                          onPressed: _selectImage,
-                          icon: const Icon(
-                            Icons.add_a_photo,
-                            color: Colors.black,
-                            size: 19,
-                          ),
+              const SizedBox(height: 20),
+              Center(
+                child: GestureDetector(
+                  onTap: _selectImage,
+                  child: _image != null
+                      ? CircleAvatar(
+                          radius: 50,
+                          backgroundImage: FileImage(File(_image!.path)),
+                        )
+                      : const CircleAvatar(
+                          radius: 50,
+                          child: Icon(Icons.person),
                         ),
-                      )
-                    ],
-                  ),
-                ],
+                ),
               ),
-              const SizedBox(
-                height: 10,
-              ),
+              const SizedBox(height: 10),
               Padding(
                 padding: const EdgeInsets.all(10),
                 child: TextFormField(
@@ -114,6 +97,35 @@ class _AddEmployeState extends State<AddEmploye> {
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please enter your name';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(10),
+                child: DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Gender',
+                  ),
+                  value: _selectedGender,
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      _selectedGender = newValue;
+                    });
+                  },
+                  items: <String>['Male', 'Female', 'Other']
+                      .map<DropdownMenuItem<String>>(
+                        (String value) => DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(value),
+                        ),
+                      )
+                      .toList(),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please select gender';
                     }
                     return null;
                   },
@@ -147,6 +159,11 @@ class _AddEmployeState extends State<AddEmploye> {
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please enter your email';
+                    } else if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                        .hasMatch(value)) {
+                      return 'Please enter a valid email address';
+                    } else if (!value.toLowerCase().endsWith('.com')) {
+                      return 'Email should end with .com';
                     }
                     return null;
                   },
@@ -181,13 +198,18 @@ class _AddEmployeState extends State<AddEmploye> {
                 child: TextFormField(
                   controller: _number,
                   keyboardType: TextInputType.phone,
+                  maxLength: 10,
                   decoration: const InputDecoration(
                     border: OutlineInputBorder(),
                     labelText: 'Phone Number',
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Please enter phonr number';
+                      return 'Please enter phone number';
+                    } else if (value.length != 10) {
+                      return 'Phone number must be 10 digits';
+                    } else if (!RegExp(r'^[0-9]+$').hasMatch(value)) {
+                      return 'Only numeric values are allowed';
                     }
                     return null;
                   },
@@ -196,7 +218,7 @@ class _AddEmployeState extends State<AddEmploye> {
               Padding(
                 padding: const EdgeInsets.all(10),
                 child: TextFormField(
-                  controller: _adress,
+                  controller: _address,
                   keyboardType: TextInputType.streetAddress,
                   decoration: const InputDecoration(
                     border: OutlineInputBorder(),
@@ -214,58 +236,74 @@ class _AddEmployeState extends State<AddEmploye> {
                 padding: const EdgeInsets.all(8.0),
                 child: ElevatedButton(
                   onPressed: () async {
-                    if (_formKey.currentState!.validate()) {}
-                    final String name = _name.text;
-                    final String address = _adress.text;
-                    final String designation = _designation.text;
-                    final String email = _email.text;
-                    final String phoneNumber = _number.text;
-
-                    if (address.isNotEmpty) {
-                      const String commonId = 'common_id_for_all_employees';
-
-                      final DocumentReference employeeRef =
-                          _addEmploye.doc(commonId);
-
-                      await employeeRef.set({
-                        "name": name,
-                        "address": address,
-                        "designation": designation,
-                        "email": email,
-                        "country": countryValue,
-                        "city": cityValue,
-                        "state": stateValue,
-                        "phone number": phoneNumber,
-                      });
-
-                      _name.text = '';
-                      _adress.text = '';
-                      _designation.text = '';
-                      _email.text = '';
-                      _number.text = '';
-
-                      Navigator.of(context).pop();
+                    if (_formKey.currentState!.validate()) {
+                      await addEmployeeToFirestore();
                     }
                   },
                   style: ButtonStyle(
-                    minimumSize: MaterialStateProperty.all(
-                      const Size(double.infinity, 50),
-                    ),
                     backgroundColor: MaterialStateProperty.all(Colors.red),
+                    padding:
+                        MaterialStateProperty.all(const EdgeInsets.all(10)),
+                    textStyle: MaterialStateProperty.all(
+                        const TextStyle(fontSize: 20)),
                   ),
                   child: const Text(
                     "Submit",
-                    style: TextStyle(
-                      fontSize: 20,
-                      color: Colors.white,
-                    ),
+                    style: TextStyle(color: Colors.white),
                   ),
                 ),
-              )
+              ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Future<void> addEmployeeToFirestore() async {
+    try {
+      String docId = _addEmployee.doc().id;
+      final String name = _name.text;
+      final String address = _address.text;
+      final String designation = _designation.text;
+      final String email = _email.text;
+      final String phoneNumber = _number.text;
+      String? imageUrl;
+
+      if (_image != null) {
+        imageUrl = await uploadImageToFirebase(_image!);
+      }
+      DateTime now = DateTime.now();
+      String formattedDate = DateFormat('yyyy-MM-dd HH:mm:ss').format(now);
+
+      await _addEmployee.doc(docId).set(
+        {
+          "id": docId,
+          "name": name,
+          "address": address,
+          "designation": designation,
+          "email": email,
+          "phone number": phoneNumber,
+          "image_url": imageUrl,
+          "gender": _selectedGender,
+          "timestamp": formattedDate,
+          "country": countryValue,
+          "state": stateValue,
+          "city": cityValue,
+        },
+      );
+
+      _name.clear();
+      _address.clear();
+      _designation.clear();
+      _email.clear();
+      _number.clear();
+
+      Navigator.of(context).pop();
+      Fluttertoast.showToast(msg: 'Employee added successfully');
+    } catch (e) {
+      print("Error adding employee: $e");
+      Fluttertoast.showToast(msg: 'Failed to add employee');
+    }
   }
 }
